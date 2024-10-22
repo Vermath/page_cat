@@ -1,0 +1,7 @@
+streamlit 
+requests 
+pandas 
+openai 
+beautifulsoup4
+lxml
+tqdm
