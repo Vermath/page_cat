@@ -123,9 +123,6 @@ def evaluate_content(content, theme):
         )
         answer = response.choices[0].message.content.strip().lower()
         return "yes" in answer
-    except openai.error.OpenAIError as e:
-        st.warning(f"OpenAI API error: {e}")
-        return False
     except Exception as e:
         st.warning(f"Unexpected error during content evaluation: {e}")
         return False
