@@ -110,7 +110,7 @@ def evaluate_content(content, theme, openai_api_key):
     try:
         response = openai.ChatCompletion.create(
             api_key=openai_api_key,
-            model="gpt-4",
+            model="gpt-4o-mini",
             messages=[
                 {
                     "role": "user",
@@ -122,9 +122,6 @@ def evaluate_content(content, theme, openai_api_key):
         )
         answer = response.choices[0].message.content.strip().lower()
         return "yes" in answer
-    except openai.error.OpenAIError as e:
-        st.warning(f"OpenAI API error: {e}")
-        return False
     except Exception as e:
         st.warning(f"Unexpected error during content evaluation: {e}")
         return False
