@@ -3,7 +3,6 @@ import streamlit as st
 import requests
 import xml.etree.ElementTree as ET
 import pandas as pd
-from urllib.parse import urlparse
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import openai
@@ -77,6 +76,9 @@ def fetch_urls_from_sitemap(sitemap_url, max_retries=3):
             else:
                 st.error(f"Failed to fetch {sitemap_url} after {max_retries} attempts.")
                 break
+        except ET.ParseError as e:
+            st.error(f"Error parsing XML from {sitemap_url}: {e}")
+            break
     return urls
 
 # Function to extract text from a webpage
@@ -104,12 +106,11 @@ def truncate_text(text, max_tokens=128000):
     return text
 
 # Function to evaluate content with OpenAI API
-def evaluate_content(content, theme, openai_api_key):
+def evaluate_content(content, theme):
     truncated_content = truncate_text(content)
     prompt = f"Determine if the following content is related to the theme '{theme}'. Respond with 'Yes' or 'No'.\n\nContent:\n{truncated_content}"
     try:
         response = openai.ChatCompletion.create(
-            api_key=openai_api_key,
             model="gpt-4o-mini",
             messages=[
                 {
@@ -122,16 +123,19 @@ def evaluate_content(content, theme, openai_api_key):
         )
         answer = response.choices[0].message.content.strip().lower()
         return "yes" in answer
+    except openai.error.OpenAIError as e:
+        st.warning(f"OpenAI API error: {e}")
+        return False
     except Exception as e:
         st.warning(f"Unexpected error during content evaluation: {e}")
         return False
 
 # Helper function to process each URL
-def process_url(session, url, theme, openai_api_key):
+def process_url(session, url, theme):
     text = extract_text(session, url)
     if not text:
         return url, False
-    is_relevant = evaluate_content(text, theme, openai_api_key)
+    is_relevant = evaluate_content(text, theme)
     return url, is_relevant
 
 # Streamlit App
@@ -144,6 +148,9 @@ def main():
     if not openai_api_key:
         st.error("OpenAI API Key not found in secrets.toml. Please add it and restart the app.")
         st.stop()
+
+    # Set the OpenAI API key globally
+    openai.api_key = openai_api_key
 
     # Inputs for domain and theme
     st.header("Input Parameters")
@@ -187,7 +194,7 @@ def main():
             st.stop()
 
         # Optionally limit the number of URLs processed
-        MAX_URLS = 2000  # Adjust as needed
+        MAX_URLS = 5000  # Adjust as needed
         all_post_urls = all_post_urls[:MAX_URLS]
 
         # Evaluating pages
@@ -207,7 +214,7 @@ def main():
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_url = {
-                executor.submit(process_url, session, url, theme, openai_api_key): url for url in all_post_urls
+                executor.submit(process_url, session, url, theme): url for url in all_post_urls
             }
 
             total_futures = len(future_to_url)
