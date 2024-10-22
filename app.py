@@ -1,5 +1,4 @@
 # app.py
-
 import streamlit as st
 import requests
 import xml.etree.ElementTree as ET
@@ -77,9 +76,7 @@ def fetch_urls_from_sitemap(sitemap_url, max_retries=3):
                 time.sleep(2)
             else:
                 st.error(f"Failed to fetch {sitemap_url} after {max_retries} attempts.")
-        except ET.ParseError as e:
-            st.error(f"Error parsing XML from {sitemap_url}: {e}")
-            break
+                break
     return urls
 
 # Function to extract text from a webpage
@@ -144,12 +141,11 @@ def process_url(session, url, theme, openai_api_key):
 def main():
     st.title("🔍 Sitemap Content Evaluator")
 
-    # Input for OpenAI API Key
-    st.sidebar.header("API Configuration")
-    openai_api_key = st.sidebar.text_input("Enter your OpenAI API Key", type="password")
+    # Read OpenAI API Key from secrets
+    openai_api_key = st.secrets.get("openai_api_key")
 
     if not openai_api_key:
-        st.warning("Please enter your OpenAI API Key in the sidebar.")
+        st.error("OpenAI API Key not found in secrets.toml. Please add it and restart the app.")
         st.stop()
 
     # Inputs for domain and theme
@@ -217,6 +213,7 @@ def main():
                 executor.submit(process_url, session, url, theme, openai_api_key): url for url in all_post_urls
             }
 
+            total_futures = len(future_to_url)
             for idx, future in enumerate(as_completed(future_to_url)):
                 url = future_to_url[future]
                 try:
@@ -227,9 +224,9 @@ def main():
                     st.warning(f"Error processing {url}: {e}")
 
                 # Update progress
-                progress = (idx + 1) / len(future_to_url)
+                progress = (idx + 1) / total_futures
                 progress_bar.progress(progress)
-                status_text.text(f"Processing URLs: {idx + 1}/{len(future_to_url)}")
+                status_text.text(f"Processing URLs: {idx + 1}/{total_futures}")
 
         # Display results
         if relevant_urls:
