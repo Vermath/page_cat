@@ -6,6 +6,7 @@ import pandas as pd
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import openai
+from openai import OpenAI  # Import OpenAI class
 from bs4 import BeautifulSoup
 from io import BytesIO
 import logging
@@ -123,12 +124,12 @@ def truncate_text(text, max_tokens=128000):
     return text
 
 # Function to evaluate content with OpenAI API
-def evaluate_content(content, theme):
+def evaluate_content(content, theme, client):
     truncated_content = truncate_text(content)
     prompt = f"Determine if the following content is related to the theme '{theme}'. Respond with 'Yes' or 'No'.\n\nContent:\n{truncated_content}"
     try:
         logger.debug(f"Sending prompt to OpenAI API for evaluation. Prompt length: {len(prompt)}")
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {
@@ -148,17 +149,17 @@ def evaluate_content(content, theme):
         return False
 
 # Helper function to process each URL
-def process_url(session, url, theme):
+def process_url(session, url, theme, client):
     logger.debug(f"Processing URL: {url}")
     text = extract_text(session, url)
     if not text:
         logger.debug(f"No text extracted from URL: {url}")
         return url, False
-    is_relevant = evaluate_content(text, theme)
+    is_relevant = evaluate_content(text, theme, client)
     logger.debug(f"URL {url} relevance result: {is_relevant}")
     return url, is_relevant
 
-# Streamlit App
+# Main function
 def main():
     st.title("🔍 Sitemap Content Evaluator")
 
@@ -169,8 +170,10 @@ def main():
         st.error("OpenAI API Key not found in secrets.toml. Please add it and restart the app.")
         return
 
-    # Set the OpenAI API key globally
-    openai.api_key = openai_api_key
+    # Initialize OpenAI client
+    client = OpenAI(
+        api_key=openai_api_key,
+    )
 
     # Inputs for domain and theme
     st.header("Input Parameters")
@@ -243,7 +246,7 @@ def main():
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_url = {
-                executor.submit(process_url, session, url, theme): url for url in all_post_urls
+                executor.submit(process_url, session, url, theme, client): url for url in all_post_urls
             }
 
             for idx, future in enumerate(as_completed(future_to_url)):
